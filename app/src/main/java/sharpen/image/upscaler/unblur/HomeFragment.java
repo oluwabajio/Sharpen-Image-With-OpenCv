@@ -10,10 +10,12 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import com.codekidlabs.storagechooser.StorageChooser;
 import com.google.android.gms.ads.AdListener;
@@ -22,6 +24,9 @@ import com.google.android.gms.ads.InterstitialAd;
 import com.google.android.gms.ads.MobileAds;
 import com.opensooq.supernova.gligar.GligarPicker;
 
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
@@ -53,6 +58,7 @@ public class HomeFragment extends Fragment {
     private static final String TAG = "HomeFragment";
     private InterstitialAd mInterstitialAd;
 
+
     @Override
     public View onCreateView(
             LayoutInflater inflater, ViewGroup container,
@@ -66,11 +72,19 @@ public class HomeFragment extends Fragment {
         return view;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+
+    }
 
     private void initListeners() {
         binding.btnOpenFile.setOnClickListener(v -> {
             if (checkPermission()) {
-                new GligarPicker().requestCode(PICKER_REQUEST_CODE).withFragment(this).limit(1).show();
+                Intent intent = new Intent();
+                intent.setType("image/*");
+                intent.setAction(Intent.ACTION_GET_CONTENT);
+                startActivityForResult(Intent.createChooser(intent, "Select Picture"), PICKER_REQUEST_CODE);
 
             } else {
             }
@@ -98,7 +112,7 @@ public class HomeFragment extends Fragment {
     }
 
     private void sharpenImage() {
-        Mat img = null;
+        Mat img = new Mat();
         Utils.bitmapToMat(inputImageBitmap, img);
 
 
@@ -178,18 +192,22 @@ public class HomeFragment extends Fragment {
         }
         switch (requestCode) {
             case PICKER_REQUEST_CODE: {
-                String pathsList[] = data.getExtras().getStringArray(GligarPicker.IMAGES_RESULT); // return list of selected images paths.
-                Bundle bundle = new Bundle();
-                bundle.putString("path", pathsList[0]);
-                //     Navigation.findNavController(getView()).navigate(R.id.action_homeFragment_to_imageViewerFragment, bundle);
-                Log.e(TAG, "onActivityResult: got here" + pathsList[0]);
+                Uri selectedImageURI = data.getData();
 
-                binding.imgImage.setImageURI(Uri.parse(pathsList[0]));
+                binding.imgImage.setImageURI(selectedImageURI);
+
+                try
+                {
+                    inputImageBitmap =  MediaStore.Images.Media.getBitmap(getActivity().getContentResolver() , selectedImageURI);
+                }
+                catch (Exception e)
+                {
+                    Toast.makeText(getActivity(), "Exception = "+ e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
 
 
-                inputImageBitmap = BitmapFactory.decodeFile(pathsList[0]);
                 inputImageBitmap = inputImageBitmap.copy(Bitmap.Config.ARGB_8888, true);
-
+binding.ly2.setVisibility(View.VISIBLE);
                 break;
             }
         }
