@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -57,6 +58,8 @@ public class HomeFragment extends Fragment {
     private Bitmap inputImageBitmap;
     private static final String TAG = "HomeFragment";
     private InterstitialAd mInterstitialAd;
+    private String  selectedImagePath;
+    private Uri selectedImageURI;
 
 
     @Override
@@ -116,7 +119,7 @@ public class HomeFragment extends Fragment {
         Utils.bitmapToMat(inputImageBitmap, img);
 
 
-        Imgproc.cvtColor(img, img, Imgproc.COLOR_RGB2BGRA);
+        // Imgproc.cvtColor(img, img, Imgproc.COLOR_RGB2BGRA);
         Mat dest = new Mat(img.rows(), img.cols(), img.type());
 
         Imgproc.GaussianBlur(img, dest, new Size(0, 0), 10);
@@ -125,6 +128,9 @@ public class HomeFragment extends Fragment {
         Bitmap img_bitmap = Bitmap.createBitmap(dest.cols(), dest.rows(), Bitmap.Config.ARGB_8888);
         Utils.matToBitmap(dest, img_bitmap);
         binding.imgImage.setImageBitmap(img_bitmap);
+        int rotateImage = getCameraPhotoOrientation(selectedImageURI, selectedImagePath);
+
+        binding.imgImage.setRotation(rotateImage);
     }
 
     private void chooseLocationDialog() {
@@ -184,6 +190,37 @@ public class HomeFragment extends Fragment {
     }
 
 
+    public int getCameraPhotoOrientation(Uri imageUri,
+                                         String imagePath) {
+        int rotate = 0;
+        try {
+            getActivity().getContentResolver().notifyChange(imageUri, null);
+            File imageFile = new File(imagePath);
+            ExifInterface exif = new ExifInterface(imageFile.getAbsolutePath());
+            int orientation = exif.getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL);
+
+            switch (orientation) {
+                case ExifInterface.ORIENTATION_ROTATE_270:
+                    rotate = 270;
+                    break;
+                case ExifInterface.ORIENTATION_ROTATE_180:
+                    rotate = 180;
+                    break;
+                case ExifInterface.ORIENTATION_ROTATE_90:
+                    rotate = 90;
+                    break;
+            }
+
+            Log.i("RotateImage", "Exif orientation: " + orientation);
+            Log.i("RotateImage", "Rotate value: " + rotate);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return rotate;
+    }
+
     @Override
     public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -193,21 +230,22 @@ public class HomeFragment extends Fragment {
         switch (requestCode) {
             case PICKER_REQUEST_CODE: {
                 Uri selectedImageURI = data.getData();
-
+                String imagePath = PathUtils.getRealPath(getActivity(), selectedImageURI);
+                Log.e(TAG, "onActivityResult: Image file path = " + imagePath);
+                this.selectedImageURI = selectedImageURI;
+                selectedImagePath = imagePath;
                 binding.imgImage.setImageURI(selectedImageURI);
+                binding.imgImage.setRotation(0);
 
-                try
-                {
-                    inputImageBitmap =  MediaStore.Images.Media.getBitmap(getActivity().getContentResolver() , selectedImageURI);
+                try {
+                    inputImageBitmap = MediaStore.Images.Media.getBitmap(getActivity().getContentResolver(), selectedImageURI);
+                    inputImageBitmap = inputImageBitmap.copy(Bitmap.Config.ARGB_8888, true);
+                    binding.ly2.setVisibility(View.VISIBLE);
+                } catch (Exception e) {
+                    Toast.makeText(getActivity(), "Exception = " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
-                catch (Exception e)
-                {
-                    Toast.makeText(getActivity(), "Exception = "+ e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
 
 
-                inputImageBitmap = inputImageBitmap.copy(Bitmap.Config.ARGB_8888, true);
-binding.ly2.setVisibility(View.VISIBLE);
                 break;
             }
         }
