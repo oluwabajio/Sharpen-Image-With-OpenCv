@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:paddingHorizontal="20dp"
     tools:context=".HomeFragment">
 
     <LinearLayout
@@ -14,10 +15,23 @@
         android:layout_above="@+id/ly2"
         android:orientation="vertical">
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            android:textAlignment="center"
+            android:textSize="18sp"
+            android:layout_marginTop="15dp"
+            android:text="To sharpen image, click on the select Picture button below"/>
+
         <Button
             android:id="@+id/btnOpenFile"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="15dp"
+            android:paddingVertical="15dp"
+            android:paddingHorizontal="15dp"
+            app:backgroundTint="@color/black"
             android:text="Select Picture" />
 
 
@@ -51,13 +65,17 @@
         android:layout_width="0dp"
         android:layout_weight="1"
         android:layout_height="wrap_content"
-        android:layout_marginRight="5dp"
+        android:paddingVertical="10dp"
+        android:paddingHorizontal="15dp"
+        app:backgroundTint="@color/black"
         android:text="Sharpen Image" />
     <Button
         android:id="@+id/btnShowOriginal"
         android:layout_width="0dp"
         android:layout_weight="1"
-        android:layout_marginLeft="5dp"
+        android:paddingVertical="10dp"
+        android:paddingHorizontal="15dp"
+        app:backgroundTint="@color/black"
         android:layout_height="wrap_content"
         android:text="Show Original" />
 </LinearLayout>
@@ -67,6 +85,9 @@
             android:id="@+id/btnDownload"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:paddingVertical="10dp"
+            android:paddingHorizontal="15dp"
+            app:backgroundTint="@color/black"
             android:text="Download Result" />
 
 

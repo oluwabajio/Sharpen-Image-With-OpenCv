@@ -2,6 +2,7 @@ package sharpen.image.upscaler.unblur;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -11,6 +12,7 @@ import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -37,6 +39,7 @@ import org.opencv.imgproc.Imgproc;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -46,7 +49,10 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.fragment.NavHostFragment;
+
 import sharpen.image.upscaler.unblur.databinding.FragmentHomeBinding;
+import com.blankj.utilcode.util.FileIOUtils;
+import static com.blankj.utilcode.util.UriUtils.uri2File;
 
 public class HomeFragment extends Fragment {
 
@@ -58,15 +64,12 @@ public class HomeFragment extends Fragment {
     private Bitmap inputImageBitmap;
     private static final String TAG = "HomeFragment";
     private InterstitialAd mInterstitialAd;
-    private String  selectedImagePath;
+    private String selectedImagePath;
     private Uri selectedImageURI;
 
 
     @Override
-    public View onCreateView(
-            LayoutInflater inflater, ViewGroup container,
-            Bundle savedInstanceState
-    ) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         binding = FragmentHomeBinding.inflate(inflater, container, false);
         View view = binding.getRoot();
@@ -111,6 +114,8 @@ public class HomeFragment extends Fragment {
     private void showOriginalImage() {
         if (inputImageBitmap != null) {
             binding.imgImage.setImageBitmap(inputImageBitmap);
+            binding.btnShowOriginal.setVisibility(View.GONE);
+            binding.btnSharpen.setVisibility(View.VISIBLE);
         }
     }
 
@@ -128,56 +133,83 @@ public class HomeFragment extends Fragment {
         Bitmap img_bitmap = Bitmap.createBitmap(dest.cols(), dest.rows(), Bitmap.Config.ARGB_8888);
         Utils.matToBitmap(dest, img_bitmap);
         binding.imgImage.setImageBitmap(img_bitmap);
+        binding.btnShowOriginal.setVisibility(View.VISIBLE);
+        binding.btnSharpen.setVisibility(View.GONE);
         int rotateImage = getCameraPhotoOrientation(selectedImageURI, selectedImagePath);
 
         binding.imgImage.setRotation(rotateImage);
     }
 
     private void chooseLocationDialog() {
-        StorageChooser chooser = new StorageChooser.Builder()
-                .withActivity(getActivity())
-                .withFragmentManager(getActivity().getFragmentManager())
-                .withMemoryBar(true)
-                .allowCustomPath(true)
-                .setType(StorageChooser.DIRECTORY_CHOOSER)
-                .build();
-        chooser.show();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            saveImage("", "jpg");
+
+        } else {
+            StorageChooser chooser = new StorageChooser.Builder().withActivity(getActivity()).withFragmentManager(getActivity().getFragmentManager()).withMemoryBar(true).allowCustomPath(true).setType(StorageChooser.DIRECTORY_CHOOSER).build();
+            chooser.show();
 
 // get path that the user has chosen
-        chooser.setOnSelectListener(new StorageChooser.OnSelectListener() {
-            @Override
-            public void onSelect(String path) {
-                saveImage(path, "jpg");
-            }
-        });
+            chooser.setOnSelectListener(new StorageChooser.OnSelectListener() {
+                @Override
+                public void onSelect(String path) {
+                    saveImage(path, "jpg");
+                }
+            });
+        }
     }
 
     private void saveImage(String path, String extension) {
-        String imgPath = path + "/" + new SimpleDateFormat("yyyyMM_dd-HHmmss").format(new Date()) + "." + extension;
-        File file = new File(imgPath);
+
 
         binding.imgImage.setDrawingCacheEnabled(true);
         Bitmap b = binding.imgImage.getDrawingCache();
-        try {
-            FileOutputStream out = new FileOutputStream(file);
-            b.compress(Bitmap.CompressFormat.JPEG, 90, out);
-            out.flush();
-            out.close();
 
-        } catch (Exception e) {
-            e.printStackTrace();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            OutputStream out2 = null;
+            String filename = new SimpleDateFormat("yyyyMM_dd-HHmmss").format(new Date()) + "." + extension;
+            String mimeType = "image/jpeg";
+            String directory = Environment.DIRECTORY_PICTURES;
+            Uri mediaContentUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME, filename);
+            values.put(MediaStore.Images.Media.MIME_TYPE, mimeType);
+            values.put(MediaStore.Images.Media.RELATIVE_PATH, directory);
+
+
+            try {
+                Uri uri = getActivity().getContentResolver().insert(mediaContentUri, values);
+                out2 = getActivity().getContentResolver().openOutputStream(uri);
+                showDownloadSavedDialog("Image Gallery (Go to Gallery/Pictures)");
+            } catch (Exception e) {
+                Toast.makeText(getActivity(), "Error: ", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "saveImage: Exception Error: " + e.getMessage());
+            }
+            b.compress(Bitmap.CompressFormat.JPEG, 90, out2);
+            //Opening an outputstream with the Uri that we got
+
+        } else {
+
+            try {
+                String imgPath = path + "/" + new SimpleDateFormat("yyyyMM_dd-HHmmss").format(new Date()) + "." + extension;
+                File file = new File(imgPath);
+
+                FileOutputStream out = new FileOutputStream(file);
+                b.compress(Bitmap.CompressFormat.JPEG, 90, out);
+                out.flush();
+                out.close();
+                showDownloadSavedDialog(path);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
-
-
-        showDownloadSavedDialog(path);
 
 
     }
 
     private void showDownloadSavedDialog(String path) {
-        new AlertDialog.Builder(getActivity())
-                .setTitle("IMAGE SAVED SUCCESSFULLY!!")
-                .setMessage("Your image has been saved to \n " + path)
+        new AlertDialog.Builder(getActivity()).setTitle("IMAGE SAVED SUCCESSFULLY!!").setMessage("Your image has been saved to \n " + path)
 
                 .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
@@ -185,21 +217,17 @@ public class HomeFragment extends Fragment {
                     }
                 })
 
-                .setIcon(android.R.drawable.ic_dialog_info)
-                .show();
+                .setIcon(android.R.drawable.ic_dialog_info).show();
     }
 
 
-    public int getCameraPhotoOrientation(Uri imageUri,
-                                         String imagePath) {
+    public int getCameraPhotoOrientation(Uri imageUri, String imagePath) {
         int rotate = 0;
         try {
             getActivity().getContentResolver().notifyChange(imageUri, null);
             File imageFile = new File(imagePath);
             ExifInterface exif = new ExifInterface(imageFile.getAbsolutePath());
-            int orientation = exif.getAttributeInt(
-                    ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_NORMAL);
+            int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
 
             switch (orientation) {
                 case ExifInterface.ORIENTATION_ROTATE_270:
@@ -230,11 +258,13 @@ public class HomeFragment extends Fragment {
         switch (requestCode) {
             case PICKER_REQUEST_CODE: {
                 Uri selectedImageURI = data.getData();
-                String imagePath = PathUtils.getRealPath(getActivity(), selectedImageURI);
+                String imagePath =  uri2File(selectedImageURI).getAbsolutePath();
                 Log.e(TAG, "onActivityResult: Image file path = " + imagePath);
                 this.selectedImageURI = selectedImageURI;
                 selectedImagePath = imagePath;
                 binding.imgImage.setImageURI(selectedImageURI);
+                binding.btnShowOriginal.setVisibility(View.GONE);
+                binding.btnSharpen.setVisibility(View.VISIBLE);
                 binding.imgImage.setRotation(0);
 
                 try {
@@ -315,5 +345,17 @@ public class HomeFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
 
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (checkPermission()) {
+            Intent intent = new Intent();
+            intent.setType("image/*");
+            intent.setAction(Intent.ACTION_GET_CONTENT);
+            startActivityForResult(Intent.createChooser(intent, "Select Picture"), PICKER_REQUEST_CODE);
+
+        }
     }
 }
